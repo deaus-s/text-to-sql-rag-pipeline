@@ -8,21 +8,22 @@ load_dotenv()
 
 DB_PATH = "data/company.db"
 client  = Groq()
-MODEL   = "llama3-70b-8192"
+MODEL = "llama-3.3-70b-versatile"
 
 SQL_GENERATION_SYSTEM = """You are an expert SQL assistant for a SQLite database.
 Your job is to convert natural language questions into precise SQL queries.
+
 Rules:
 - Output ONLY the raw SQL query. No explanation, no markdown, no backticks.
 - Use only the tables and columns provided in the schema context.
 - For text comparisons, use LIKE with % for partial matches.
-- Always use table aliases when joining.
-- Never use DROP, DELETE, UPDATE, INSERT — only SELECT.
+- Always use table aliases when joining (e.g., e for employees, s for sales).
+- Never use DROP, DELETE, UPDATE, INSERT, or any DDL/DML besides SELECT.
 """
 
 ANSWER_INTERPRETATION_SYSTEM = """You are a helpful data analyst assistant.
-Given a user question, the SQL query run, and raw results,
-provide a clear human-friendly answer in 2-4 sentences.
+Given a user's original question, the SQL query that was run, and the raw results,
+provide a clear, concise, human-friendly answer in 2-4 sentences.
 Include specific numbers and names from the results.
 """
 
@@ -38,6 +39,7 @@ def generate_sql(question: str, schema_context: str) -> str:
 User Question: {question}
 
 Generate a SQLite SQL query to answer this question:"""
+
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -72,11 +74,17 @@ def interpret_results(question: str, sql: str, rows: list, columns: list) -> str
         for row in rows[:20]:
             lines.append(" | ".join(str(v) for v in row))
         result_text = "\n".join(lines)
+
     prompt = f"""User Question: {question}
-SQL Query Executed: {sql}
+
+SQL Query Executed:
+{sql}
+
 Query Results:
 {result_text}
-Provide a clear, friendly answer:"""
+
+Provide a clear, friendly answer based on these results:"""
+
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -88,17 +96,24 @@ Provide a clear, friendly answer:"""
     return response.choices[0].message.content.strip()
 
 def ask(question: str) -> dict:
-    result = {"question": question, "schema_context": "", "sql": "",
-              "columns": [], "rows": [], "answer": "", "error": None}
+    result = {
+        "question": question,
+        "schema_context": "",
+        "sql": "",
+        "columns": [],
+        "rows": [],
+        "answer": "",
+        "error": None
+    }
     try:
-        schema_context           = retrieve_schema_context(question)
+        schema_context       = retrieve_schema_context(question)
         result["schema_context"] = schema_context
-        sql                      = generate_sql(question, schema_context)
-        result["sql"]            = sql
-        rows, columns            = execute_sql(sql)
-        result["rows"]           = rows
-        result["columns"]        = columns
-        result["answer"]         = interpret_results(question, sql, rows, columns)
+        sql                  = generate_sql(question, schema_context)
+        result["sql"]        = sql
+        rows, columns        = execute_sql(sql)
+        result["rows"]       = rows
+        result["columns"]    = columns
+        result["answer"]     = interpret_results(question, sql, rows, columns)
     except Exception as e:
         result["error"]  = str(e)
         result["answer"] = f"❌ Error: {e}"
