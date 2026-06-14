@@ -573,11 +573,15 @@ with left:
 
     # ── Build vector index when DB is loaded ──
     if st.session_state.db_path and not st.session_state.index_built:
-        from schema_rag import get_schema_documents, build_vector_store
-        with st.spinner("Building search index for your database..."):
-            docs = get_schema_documents(st.session_state.db_path)
-            build_vector_store(docs)
-            st.session_state.index_built = True
+    from schema_rag import get_schema_documents, build_vector_store
+    import shutil
+    with st.spinner("Building search index for your database..."):
+        # Clear old index so it rebuilds fresh for new database
+        if os.path.exists("data/faiss_index"):
+            shutil.rmtree("data/faiss_index")
+        docs = get_schema_documents(st.session_state.db_path)
+        build_vector_store(docs)
+        st.session_state.index_built = True
 
     # ── Default DB (sample) ──
     if not st.session_state.db_path:

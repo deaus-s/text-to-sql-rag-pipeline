@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_PATH = "data/company.db"
+import streamlit as st
+DB_PATH = st.session_state.get("db_path", "data/company.db") if hasattr(st, "session_state") else "data/company.db"
 client  = Groq()
 MODEL = "llama-3.3-70b-versatile"
 
