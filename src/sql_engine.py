@@ -12,11 +12,13 @@ MODEL = "llama-3.3-70b-versatile"
 SQL_GENERATION_SYSTEM = """You are an expert SQL assistant for a SQLite database.
 Your job is to convert natural language questions into precise SQL queries.
 
-Rules:
-- Output ONLY the raw SQL query. No explanation, no markdown formatting, no backticks.
-- Use only the tables and columns provided in the schema context.
-- Always use table aliases when joining.
-- Never execute DDL/DML besides SELECT statements.
+Strict Operational Instructions:
+1. Output ONLY the raw SQL query. No explanations, no markdown blocks, no backticks.
+2. Use only the tables and columns provided in the schema context. 
+3. Cryptic naming protection: Map fuzzy real-world text targets to matching system elements creatively.
+4. Robust string matching: To avoid case mismatch errors with real-world inputs, always transform string comparisons into case-insensitive matching rules using LOWER() and LIKE keywords, e.g., LOWER(name) LIKE '%john%'.
+5. Always use table aliases when joining.
+6. Never execute DDL/DML besides SELECT statements.
 """
 
 ANSWER_INTERPRETATION_SYSTEM = """You are a helpful data analyst assistant.
@@ -44,8 +46,14 @@ def generate_sql(question: str, schema_context: str) -> str:
     return re.sub(r"```sql|```", "", sql).strip()
 
 def execute_sql(sql: str, db_path: str) -> tuple:
-    if not sql.strip().upper().startswith("SELECT"):
-        raise ValueError("Only SELECT queries are permitted.")
+    # Programmatic Guardrails: Block write actions and enforce dynamic output truncation limits
+    upper_sql = sql.strip().upper()
+    if not upper_sql.startswith("SELECT"):
+        raise ValueError("Only SELECT analytics queries are permitted.")
+    
+    if "LIMIT" not in upper_sql:
+        sql = sql.rstrip(';') + " LIMIT 100;"
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     try:
@@ -91,5 +99,5 @@ def ask(question: str, db_path: str, index_dir: str) -> dict:
         result["answer"] = interpret_results(question, sql, rows, columns)
     except Exception as e:
         result["error"] = str(e)
-        result["answer"] = f"❌ Error: {e}"
+        result["answer"] = f"❌ Error executing operations: {e}"
     return result
