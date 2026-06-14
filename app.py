@@ -584,20 +584,31 @@ with left:
             st.session_state.index_built = True
 
     # ── Default DB (sample) ──
+  # ── Default DB (sample) — only if nothing uploaded ──
     if not st.session_state.db_path:
         from setup_database import create_database
         from schema_rag import get_schema_documents, build_vector_store
         default_db = "data/company.db"
         if not os.path.exists(default_db):
             create_database()
-        if not st.session_state.index_built:
-            with st.spinner("Loading sample database..."):
-                docs = get_schema_documents(default_db)
-                build_vector_store(docs)
-                st.session_state.db_path     = default_db
-                st.session_state.db_name     = "sample_company.db"
-                st.session_state.schema      = get_db_schema(default_db)
-                st.session_state.index_built = True
+        with st.spinner("Loading sample database..."):
+            docs = get_schema_documents(default_db)
+            build_vector_store(docs)
+            st.session_state.db_path     = default_db
+            st.session_state.db_name     = "sample_company.db"
+            st.session_state.schema      = get_db_schema(default_db)
+            st.session_state.index_built = True
+
+    # ── Rebuild index for uploaded DB ──
+    elif not st.session_state.index_built:
+        import shutil
+        from schema_rag import get_schema_documents, build_vector_store
+        with st.spinner("Building search index for your database..."):
+            if os.path.exists("data/faiss_index"):
+                shutil.rmtree("data/faiss_index")
+            docs = get_schema_documents(st.session_state.db_path)
+            build_vector_store(docs)
+            st.session_state.index_built = True
 
     # ── Question input ──
     st.markdown('<div class="qm-input-wrap">', unsafe_allow_html=True)
