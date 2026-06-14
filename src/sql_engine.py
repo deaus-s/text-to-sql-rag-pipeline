@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 client = Groq()
-MODEL = "llama-3.3-70b-versatile" [cite: 111]
+MODEL = "llama-3.3-70b-versatile"
 
 SQL_GENERATION_SYSTEM = """You are an expert SQL assistant for a SQLite database.
 Your job is to convert natural language questions into precise SQL queries.

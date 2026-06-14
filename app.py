@@ -129,7 +129,6 @@ with layout_right:
     uploaded = st.file_uploader("Upload `.db` or `.csv` files", type=["db", "csv"])
     
     if uploaded:
-        # Check if it is a completely new file to prevent endless processing cycles
         if st.session_state.db_name != uploaded.name:
             user_dir = os.path.join(tempfile.gettempdir(), st.session_state.session_id)
             os.makedirs(user_dir, exist_ok=True)
@@ -144,7 +143,6 @@ with layout_right:
                     with open(target_db, "wb") as f:
                         f.write(uploaded.getbuffer())
                 
-                # Build isolated vector indices [cite: 86]
                 docs = get_schema_documents(target_db)
                 build_vector_store(docs, target_index)
                 
@@ -163,7 +161,6 @@ with layout_right:
             st.session_state.history = []
             st.rerun()
             
-    # Schema Explorer view Panel
     if st.session_state.db_path:
         with st.expander("📊 Inspect Active Schema Context", expanded=True):
             schema = get_db_schema(st.session_state.db_path)
@@ -177,9 +174,8 @@ with layout_left:
     st.subheader("💬 Ask Your Database")
     
     if not st.session_state.db_path:
-        # Dynamic fallback setup to load example database automatically
-        default_db = "data/company.db" [cite: 14]
-        if os.path.exists(default_db): [cite: 52]
+        default_db = "data/company.db"
+        if os.path.exists(default_db):
             user_dir = os.path.join(tempfile.gettempdir(), st.session_state.session_id)
             os.makedirs(user_dir, exist_ok=True)
             target_index = os.path.join(user_dir, "company_idx")
@@ -197,7 +193,7 @@ with layout_left:
             
     if st.session_state.db_path:
         with st.form("query_form", clear_on_submit=True):
-            user_prompt = st.text_input("Enter natural text prompt:", placeholder="e.g., Return top 5 staff tiers by pay scale") [cite: 81]
+            user_prompt = st.text_input("Enter natural text prompt:", placeholder="e.g., Return top 5 staff tiers by pay scale")
             submit_btn = st.form_submit_button("Run Analytics Engine")
             
         if submit_btn and user_prompt.strip():
@@ -205,7 +201,6 @@ with layout_left:
                 response_payload = run_query(user_prompt.strip(), st.session_state.db_path, st.session_state.index_dir)
                 st.session_state.history.insert(0, response_payload)
                 
-        # History Display Layout
         for run in st.session_state.history:
             st.markdown(f"### Q: {run['question']}")
             if run["error"]:
