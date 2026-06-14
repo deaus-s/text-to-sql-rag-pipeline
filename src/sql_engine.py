@@ -3,17 +3,15 @@ import re
 from groq import Groq
 from schema_rag import get_or_build_vector_store
 from dotenv import load_dotenv
-
+ 
 load_dotenv()
-
-import streamlit as st
-DB_PATH = st.session_state.get("db_path", "data/company.db") if hasattr(st, "session_state") else "data/company.db"
-client  = Groq()
-MODEL = "llama-3.3-70b-versatile"
-
+ 
+client = Groq()
+MODEL  = "llama-3.3-70b-versatile"
+ 
 SQL_GENERATION_SYSTEM = """You are an expert SQL assistant for a SQLite database.
 Your job is to convert natural language questions into precise SQL queries.
-
+ 
 Rules:
 - Output ONLY the raw SQL query. No explanation, no markdown, no backticks.
 - Use only the tables and columns provided in the schema context.
@@ -21,26 +19,25 @@ Rules:
 - Always use table aliases when joining (e.g., e for employees, s for sales).
 - Never use DROP, DELETE, UPDATE, INSERT, or any DDL/DML besides SELECT.
 """
-
+ 
 ANSWER_INTERPRETATION_SYSTEM = """You are a helpful data analyst assistant.
 Given a user's original question, the SQL query that was run, and the raw results,
 provide a clear, concise, human-friendly answer in 2-4 sentences.
 Include specific numbers and names from the results.
 """
-
+ 
 def retrieve_schema_context(question: str, k: int = 3) -> str:
     vectorstore = get_or_build_vector_store()
     docs = vectorstore.similarity_search(question, k=k)
     return "\n\n".join([doc.page_content for doc in docs])
-
+ 
 def generate_sql(question: str, schema_context: str) -> str:
     prompt = f"""Database Schema Context:
 {schema_context}
-
+ 
 User Question: {question}
-
+ 
 Generate a SQLite SQL query to answer this question:"""
-
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -52,8 +49,9 @@ Generate a SQLite SQL query to answer this question:"""
     sql = response.choices[0].message.content.strip()
     sql = re.sub(r"```sql|```", "", sql).strip()
     return sql
-
-def execute_sql(sql: str, db_path: str = DB_PATH) -> tuple:
+ 
+def execute_sql(sql: str, db_path: str) -> tuple:
+    """Execute SQL against the given db_path — always passed explicitly."""
     if not sql.strip().upper().startswith("SELECT"):
         raise ValueError("Only SELECT queries are permitted.")
     conn = sqlite3.connect(db_path)
@@ -65,7 +63,7 @@ def execute_sql(sql: str, db_path: str = DB_PATH) -> tuple:
     finally:
         conn.close()
     return rows, columns
-
+ 
 def interpret_results(question: str, sql: str, rows: list, columns: list) -> str:
     if not rows:
         result_text = "The query returned no results."
@@ -75,17 +73,17 @@ def interpret_results(question: str, sql: str, rows: list, columns: list) -> str
         for row in rows[:20]:
             lines.append(" | ".join(str(v) for v in row))
         result_text = "\n".join(lines)
-
+ 
     prompt = f"""User Question: {question}
-
+ 
 SQL Query Executed:
 {sql}
-
+ 
 Query Results:
 {result_text}
-
+ 
 Provide a clear, friendly answer based on these results:"""
-
+ 
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -95,8 +93,12 @@ Provide a clear, friendly answer based on these results:"""
         temperature=0.3
     )
     return response.choices[0].message.content.strip()
-
-def ask(question: str) -> dict:
+ 
+def ask(question: str, db_path: str = "data/company.db") -> dict:
+    """
+    Main entry point. db_path is passed explicitly from the UI
+    so it always queries the correct uploaded database.
+    """
     result = {
         "question": question,
         "schema_context": "",
@@ -107,15 +109,16 @@ def ask(question: str) -> dict:
         "error": None
     }
     try:
-        schema_context       = retrieve_schema_context(question)
+        schema_context           = retrieve_schema_context(question)
         result["schema_context"] = schema_context
-        sql                  = generate_sql(question, schema_context)
-        result["sql"]        = sql
-        rows, columns        = execute_sql(sql)
-        result["rows"]       = rows
-        result["columns"]    = columns
-        result["answer"]     = interpret_results(question, sql, rows, columns)
+        sql                      = generate_sql(question, schema_context)
+        result["sql"]            = sql
+        rows, columns            = execute_sql(sql, db_path)
+        result["rows"]           = rows
+        result["columns"]        = columns
+        result["answer"]         = interpret_results(question, sql, rows, columns)
     except Exception as e:
         result["error"]  = str(e)
         result["answer"] = f"❌ Error: {e}"
     return result
+ 
