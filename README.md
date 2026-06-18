@@ -1,4 +1,4 @@
-# 🗄️ AI That Talks to Your Database
+source venv/bin/activate# 🗄️ AI That Talks to Your Database
 ### Text-to-SQL using RAG + GPT-4o + FAISS + Streamlit
 
 Ask any question in plain English. The AI writes the SQL, runs it, and explains the result.

@@ -1,8 +1,5 @@
-.env
-venv/
-data/
 __pycache__/
-*.pyc
 .env
-__pycache__/
 data/
+power_bi_prepared_data/
+.stfolder/

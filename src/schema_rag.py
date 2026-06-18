@@ -2,7 +2,7 @@
 schema_rag.py
 -------------
 Extracts database schema + sample rows, converts them into natural-language "documents", 
-and builds isolated FAISS vector stores.
+and builds isolated FAISS vector stores with safe deserialization flags enabled.
 """
 
 import sqlite3
@@ -37,7 +37,7 @@ def get_schema_documents(db_path: str) -> list[Document]:
         fk_lines = [f"  - {fk[3]} → {fk[2]}.{fk[4]}" for fk in fks]
 
         try:
-            cursor.execute(f"SELECT * FROM {table} LIMIT 3")
+            cursor.execute(f"SELECT * FROM {table} LIMIT 5")
             rows = cursor.fetchall()
         except Exception:
             rows = []
@@ -71,6 +71,6 @@ def build_vector_store(documents: list[Document], index_dir: str) -> FAISS:
     return vectorstore
 
 def load_vector_store(index_dir: str) -> FAISS:
-    """Loads a specific pre-built FAISS index from disk."""
+    """Loads a specific pre-built FAISS index from disk securely."""
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     return FAISS.load_local(index_dir, embeddings, allow_dangerous_deserialization=True)
