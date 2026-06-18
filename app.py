@@ -7,6 +7,8 @@ import sys
 import os
 import sqlite3
 import tempfile
+import csv
+import io
 import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv
@@ -22,9 +24,9 @@ st.set_page_config(page_title="QueryMind Enterprise — AI Engine", page_icon="�
 # Enhanced Premium Cyberpunk Interface Stylings
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700&family=JetBrains+Mono:wght=400;500&display=swap');
     
-    html, body, [data-testid="stAppViewContainer"] {
+    html, body, [data-testid=\"stAppViewContainer\"] {
         background-color: #060509 !important;
         color: #f3f4f6 !important;
         font-family: 'Plus Jakarta Sans', sans-serif !important;
@@ -63,6 +65,34 @@ def get_db_schema(db_path: str) -> dict:
     conn.close()
     return schema
 
+def convert_csv_to_sqlite(csv_file, target_db_path: str):
+    """Parses an uploaded CSV file asset and converts it dynamically into a SQLite table."""
+    content = csv_file.read().decode("utf-8")
+    reader = csv.DictReader(io.StringIO(content))
+    rows = list(reader)
+    if not rows:
+        return None
+    
+    # Sanitize and capture clean table and column names
+    cols = list(rows[0].keys())
+    table_name = os.path.splitext(csv_file.name)[0].replace(" ", "_").replace("-", "_").lower()
+    
+    conn = sqlite3.connect(target_db_path)
+    cursor = conn.cursor()
+    
+    # Create the target table schema dynamically
+    col_definitions = ", ".join([f'"{c}" TEXT' for c in cols])
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS "{table_name}" ({col_definitions})')
+    
+    # Batch load entries safely
+    placeholders = ", ".join(["?" for _ in cols])
+    for row in rows:
+        cursor.execute(f'INSERT INTO "{table_name}" VALUES ({placeholders})', [row[c] for c in cols])
+        
+    conn.commit()
+    conn.close()
+    return table_name
+
 if "session_id" not in st.session_state:
     st.session_state.session_id = next(tempfile._get_candidate_names())
     st.session_state.db_path = None
@@ -81,18 +111,24 @@ layout_left, layout_right = st.columns([3, 1], gap="large")
 
 with layout_right:
     st.markdown("### 🛠️ Infrastructure Connect")
-    uploaded = st.file_uploader("Upload local SQLite database (`.db`)", type=["db"])
+    # UPDATED: Added target parameters explicitly recognizing ["db", "csv"] array targets
+    uploaded = st.file_uploader("Upload business target arrays (`.db`, `.csv`)", type=["db", "csv"])
     
     if uploaded and st.session_state.db_name != uploaded.name:
         user_dir = os.path.join(tempfile.gettempdir(), st.session_state.session_id)
         os.makedirs(user_dir, exist_ok=True)
-        target_db = os.path.join(user_dir, "source.db")
+        target_db = os.path.join(user_dir, "source_cluster.db")
         target_index = os.path.join(user_dir, "faiss_index")
         
-        with open(target_db, "wb") as f:
-            f.write(uploaded.getbuffer())
-            
-        with st.spinner("Analyzing Database Schema..."):
+        with st.spinner("Processing Data Pipeline Asset Elements..."):
+            if uploaded.name.lower().endswith(".csv"):
+                # Dynamically compile the file down to SQLite if it's a CSV format
+                convert_csv_to_sqlite(uploaded, target_db)
+            else:
+                # Direct write processing sequence for deep native .db uploads
+                with open(target_db, "wb") as f:
+                    f.write(uploaded.getbuffer())
+                    
             docs = get_schema_documents(target_db)
             build_vector_store(docs, target_index)
             
@@ -103,7 +139,7 @@ with layout_right:
         st.rerun()
 
     if st.session_state.db_name:
-        st.success(f"Connected to: **{st.session_state.db_name}**")
+        st.success(f"Connected to Cluster: **{st.session_state.db_name}**")
         if st.button("Reset Session Connection", use_container_width=True):
             st.session_state.db_path = None
             st.session_state.index_dir = None
@@ -136,10 +172,10 @@ with layout_left:
             st.session_state.db_name = "sample_company.db"
             st.rerun()
         else:
-            st.warning("Please upload a `.db` file in the sidebar to initialize the AI analysis layer.")
+            st.warning("Please upload a `.db` or `.csv` file in the sidebar to initialize the AI analysis layer.")
 
     if st.session_state.db_path:
-        user_prompt = st.text_input("Ask anything about your data (e.g., 'What is our total revenue by region?')")
+        user_prompt = st.text_input("Ask anything about your data (e.g., 'List all records from the dataset' or 'Summarize total value')")
         if st.button("Execute Intelligence Query", type="primary"):
             if user_prompt.strip():
                 with st.spinner("AI is generating SQL & summarizing results..."):
