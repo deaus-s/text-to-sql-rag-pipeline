@@ -121,8 +121,10 @@ def create_database():
 def generate_powerbi_preprepared_data():
     """Extracts tables, models into a Star Schema, and outputs clean CSVs for Power BI."""
     print("📐 Running pipeline to pre-calculate and structure data maps for Power BI...")
+    if not os.path.exists(DB_PATH):
+        return
+        
     conn = sqlite3.connect(DB_PATH)
-    
     query = """
     SELECT 
         s.id AS sale_id, s.product_id, p.name AS product_name, p.category AS product_category,
@@ -136,7 +138,6 @@ def generate_powerbi_preprepared_data():
     conn.close()
 
     if df.empty:
-        print("⚠ Operational Warning: Transaction logs are empty.")
         return
 
     # Advanced Calculations (Z-Score Outliers, Growth Targets, Quantiles)

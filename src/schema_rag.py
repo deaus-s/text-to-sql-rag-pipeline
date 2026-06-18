@@ -37,7 +37,7 @@ def get_schema_documents(db_path: str) -> list[Document]:
         fk_lines = [f"  - {fk[3]} → {fk[2]}.{fk[4]}" for fk in fks]
 
         try:
-            cursor.execute(f"SELECT * FROM {table} LIMIT 5")
+            cursor.execute(f"SELECT * FROM {table} LIMIT 3")
             rows = cursor.fetchall()
         except Exception:
             rows = []
